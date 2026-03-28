@@ -1,0 +1,23 @@
+# Stock Agent Dependencies
+
+# Price data
+yfinance>=0.2.36
+
+# News fetching
+feedparser>=6.0.10
+newsapi-python>=0.2.7
+
+# HTTP requests for SEC EDGAR
+requests>=2.31.0
+
+# AI digest generation
+anthropic>=0.39.0
+
+# WhatsApp delivery via Twilio
+twilio>=8.10.0
+
+# Scheduling
+schedule>=1.2.1
+
+# Environment configuration
+python-dotenv>=1.0.0
