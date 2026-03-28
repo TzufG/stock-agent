@@ -8,45 +8,40 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 # Run the agent (continuous monitoring with scheduler)
 python main.py
 
-# One-off commands
-python main.py --check              # Single price check
-python main.py --briefing           # Send daily briefing now
-python main.py --analyze TICKER     # Deep dive analysis for a ticker
-python main.py --reset              # Reset all price baselines
-
 # Install dependencies
 pip install -r requirements.txt
+
+# Verify syntax
+python -c "import ast; [ast.parse(open(f).read()) for f in ['main.py','agent.py','price_monitor.py','news_fetcher.py','ai_summarizer.py','whatsapp_sender.py','config.py']]"
 ```
 
 ## Architecture
 
-This is a stock/ETF monitoring agent that sends WhatsApp alerts via Twilio.
-
 **Data Flow:**
-1. `main.py` runs the scheduler (`schedule` library) with two jobs:
-   - Price check every N minutes (default 15)
-   - Daily briefing at configured time (default 08:00)
-2. `data_fetchers.py` pulls data from three sources:
-   - **yfinance**: Real-time prices via `fetch_price()` / `fetch_prices()`
-   - **Yahoo Finance RSS + NewsAPI**: News via `fetch_all_news()`
-   - **SEC EDGAR**: Filings (8-K, 10-Q, 10-K, DEF14A) via `fetch_sec_filings()`
-3. `alerts.py` manages price thresholds:
-   - `AlertManager` tracks baselines in `baselines.json`
-   - Triggers WhatsApp alert when price moves ≥threshold% from baseline
-   - Resets baseline to current price after each alert
-4. `ai_digest.py` generates AI content via Claude:
-   - `generate_daily_briefing()`: Morning summary for all watchlist tickers
-   - `generate_ticker_deep_dive()`: Single-ticker analysis
+1. `main.py` sets up logging (stdout + agent.log) and runs the scheduler:
+   - Morning report at `MORNING_REPORT_TIME` (default 07:30)
+   - Price check every `PRICE_CHECK_INTERVAL_MINUTES` (default 15)
+   - Sends morning report immediately on startup
+2. `agent.py` (`StockAgent`) orchestrates all components
+3. `price_monitor.py` (`PriceMonitor`) fetches prices via yfinance:
+   - `fetch_all()` returns `list[PriceSnapshot]`
+   - `check_alerts()` returns tickers that moved >= threshold from `last_alert_price`
+   - `morning_summary_lines()` returns formatted price lines
+4. `news_fetcher.py` (`NewsFetcher`) aggregates from three sources:
+   - Yahoo Finance RSS
+   - NewsAPI (optional, requires `NEWS_API_KEY`)
+   - SEC EDGAR (8-K, DEF14A, 10-Q, 10-K)
+5. `ai_summarizer.py` generates content:
+   - `build_morning_digest()` calls Claude claude-sonnet-4-20250514 with fallback
+   - `build_alert_message()` instant formatting, no API call
+6. `whatsapp_sender.py` (`WhatsAppSender`) sends via Twilio:
+   - `send()` for single messages (truncates at 1500 chars)
+   - `send_chunks()` for long messages
 
-**Key Data Classes** (in `data_fetchers.py`):
-- `PriceData`: Current price, change%, volume, 52-week range
-- `NewsItem`: Title, source, URL, published date
-- `SECFiling`: Filing type, title, URL, filed date
+**Key Data Classes:**
+- `PriceSnapshot`: ticker, price, prev_close, change_pct, direction, timestamp
+- `NewsItem`: ticker, title, summary, source, url, published
 
 **Configuration** (`config.py`):
-- All settings loaded from `.env` via `python-dotenv`
-- `Config.validate()` returns list of missing required values
-- Watchlist is comma-separated tickers in `WATCHLIST` env var
-
-**State Persistence:**
-- `baselines.json`: Alert baselines persisted between runs (gitignored)
+- All settings loaded from `.env` as module-level variables
+- No Config class - direct imports like `config.WATCHLIST`

@@ -43,3 +43,4 @@ Thumbs.db
 
 # Project specific
 baselines.json
+agent.log
