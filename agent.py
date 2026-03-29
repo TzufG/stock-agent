@@ -6,7 +6,7 @@ import config
 from price_monitor import PriceMonitor
 from news_fetcher import NewsFetcher
 from ai_summarizer import build_morning_digest, build_alert_message
-from whatsapp_sender import WhatsAppSender
+from email_sender import EmailSender
 
 
 class StockAgent:
@@ -25,12 +25,11 @@ class StockAgent:
             news_api_key=config.NEWS_API_KEY,
         )
 
-        # Initialize WhatsApp sender
-        self.whatsapp = WhatsAppSender(
-            account_sid=config.TWILIO_ACCOUNT_SID,
-            auth_token=config.TWILIO_AUTH_TOKEN,
-            from_number=config.TWILIO_WHATSAPP_FROM,
-            to_number=config.WHATSAPP_TO,
+        # Initialize email sender
+        self.email = EmailSender(
+            smtp_email=config.SMTP_EMAIL,
+            smtp_password=config.SMTP_PASSWORD,
+            to_email=config.EMAIL_TO,
         )
 
         # Store config for later use
@@ -39,7 +38,7 @@ class StockAgent:
 
     def check_price_alerts(self) -> None:
         """
-        Check for price alerts and send WhatsApp message for each trigger.
+        Check for price alerts and send email for each trigger.
         """
         alerts = self.price_monitor.check_alerts()
 
@@ -50,13 +49,13 @@ class StockAgent:
                 price=snap.price,
                 prev_close=snap.prev_close,
             )
-            self.whatsapp.send(message)
+            self.email.send_alert(snap.ticker, message)
             print(f"Alert sent for {snap.ticker}: {snap.change_pct:+.2f}%")
 
     def send_morning_report(self) -> None:
         """
         Generate and send the morning briefing report.
-        Fetches prices, news, builds AI digest, and sends via WhatsApp.
+        Fetches prices, news, builds AI digest, and sends via email.
         """
         print("Fetching prices...")
         price_lines = self.price_monitor.morning_summary_lines()
@@ -73,7 +72,7 @@ class StockAgent:
         )
 
         print("Sending morning report...")
-        success = self.whatsapp.send_chunks(digest)
+        success = self.email.send_morning_report(digest)
 
         if success:
             print("Morning report sent successfully!")

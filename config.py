@@ -23,11 +23,10 @@ def get_list(key: str, default: str = "") -> list[str]:
 # Anthropic
 ANTHROPIC_API_KEY: str = os.getenv("ANTHROPIC_API_KEY", "")
 
-# Twilio (WhatsApp)
-TWILIO_ACCOUNT_SID: str = os.getenv("TWILIO_ACCOUNT_SID", "")
-TWILIO_AUTH_TOKEN: str = os.getenv("TWILIO_AUTH_TOKEN", "")
-TWILIO_WHATSAPP_FROM: str = os.getenv("TWILIO_WHATSAPP_FROM", "")
-WHATSAPP_TO: str = os.getenv("WHATSAPP_TO", "")
+# Email (Gmail)
+SMTP_EMAIL: str = os.getenv("SMTP_EMAIL", "")
+SMTP_PASSWORD: str = os.getenv("SMTP_PASSWORD", "")
+EMAIL_TO: str = os.getenv("EMAIL_TO", "")
 
 # NewsAPI (optional)
 NEWS_API_KEY: str = os.getenv("NEWS_API_KEY", "")
