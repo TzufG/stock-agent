@@ -4,7 +4,7 @@ Main Stock Agent that orchestrates all components.
 
 import config
 from price_monitor import PriceMonitor
-from news_fetcher import NewsFetcher
+from news_fetcher import NewsFetcher, TickerReport
 from ai_summarizer import build_morning_digest, build_alert_message
 from email_sender import EmailSender
 
@@ -60,8 +60,11 @@ class StockAgent:
         print("Fetching prices...")
         price_lines = self.price_monitor.morning_summary_lines()
 
-        print("Fetching news...")
-        news_by_ticker = self.news_fetcher.fetch_all(days_back=1)
+        print("Fetching news and financial data...")
+        reports_by_ticker = self.news_fetcher.fetch_all(days_back=1)
+
+        # Convert TickerReport to legacy format for ai_summarizer compatibility
+        news_by_ticker = self._extract_news_from_reports(reports_by_ticker)
 
         print("Generating AI digest...")
         digest = build_morning_digest(
@@ -78,3 +81,16 @@ class StockAgent:
             print("Morning report sent successfully!")
         else:
             print("Failed to send morning report")
+
+    def _extract_news_from_reports(
+        self, reports: dict[str, TickerReport]
+    ) -> dict[str, list]:
+        """
+        Extract news items from TickerReports for backward compatibility.
+        """
+        result = {}
+        for ticker, report in reports.items():
+            all_news = report.all_news
+            if all_news:
+                result[ticker] = all_news
+        return result
