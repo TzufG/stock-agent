@@ -17,6 +17,7 @@ class TickerFundamentals:
     """Container for ticker financial fundamentals."""
     ticker: str
     pe_ratio: Optional[float]
+    forward_pe: Optional[float]
     market_cap: Optional[float]
     market_cap_str: str
     sector: str
@@ -24,44 +25,153 @@ class TickerFundamentals:
     fifty_two_week_high: Optional[float]
     fifty_two_week_low: Optional[float]
     current_price: Optional[float]
+    beta: Optional[float]
+    dividend_yield: Optional[float]
+    revenue_growth: Optional[float]
+    profit_margin: Optional[float]
+    debt_to_equity: Optional[float]
+    business_summary: str
+
+
+# Industry keywords for macro context analysis
+INDUSTRY_KEYWORDS = {
+    # Technology & AI
+    "Technology": [
+        "AI adoption", "cloud infrastructure", "cybersecurity spending",
+        "digital transformation", "semiconductor demand", "enterprise software"
+    ],
+    "Semiconductors": [
+        "AI chip demand", "foundry capacity", "chip export restrictions",
+        "data center buildout", "automotive chips", "supply chain reshoring"
+    ],
+    "Software—Infrastructure": [
+        "cloud migration", "AI integration", "enterprise spending",
+        "SaaS growth", "cybersecurity threats", "developer tools"
+    ],
+    "Software—Application": [
+        "AI copilots", "productivity software", "subscription fatigue",
+        "enterprise adoption", "vertical SaaS", "automation trends"
+    ],
+    "Internet Content & Information": [
+        "digital advertising", "AI search disruption", "content moderation",
+        "antitrust regulation", "user engagement", "creator economy"
+    ],
+    # Defense & Aerospace
+    "Aerospace & Defense": [
+        "defense budget increases", "geopolitical tensions", "hypersonic weapons",
+        "space commercialization", "nuclear modernization", "NATO expansion"
+    ],
+    # Consumer & Retail
+    "Consumer Electronics": [
+        "smartphone upgrade cycles", "wearables growth", "AR/VR adoption",
+        "supply chain costs", "premium pricing power", "ecosystem lock-in"
+    ],
+    "Discount Stores": [
+        "consumer spending", "inflation impact", "private label growth",
+        "e-commerce competition", "wage pressures", "inventory management"
+    ],
+    "Internet Retail": [
+        "e-commerce penetration", "logistics automation", "last-mile delivery",
+        "advertising revenue", "subscription services", "marketplace dynamics"
+    ],
+    # Financial
+    "Asset Management": [
+        "interest rate environment", "AUM flows", "passive vs active",
+        "alternative investments", "fee compression", "regulatory changes"
+    ],
+    "Banks—Diversified": [
+        "net interest margins", "credit quality", "capital requirements",
+        "digital banking", "loan growth", "deposit competition"
+    ],
+    # Healthcare
+    "Drug Manufacturers": [
+        "patent cliffs", "GLP-1 competition", "FDA approvals",
+        "pricing pressure", "M&A activity", "pipeline catalysts"
+    ],
+    "Biotechnology": [
+        "clinical trial results", "gene therapy", "AI drug discovery",
+        "funding environment", "regulatory pathways", "partnership deals"
+    ],
+    # Energy
+    "Oil & Gas": [
+        "OPEC+ production", "energy transition", "refining margins",
+        "geopolitical supply risks", "carbon regulations", "LNG demand"
+    ],
+    "Utilities—Regulated Electric": [
+        "rate case outcomes", "renewable integration", "grid modernization",
+        "data center power demand", "nuclear renaissance", "regulatory support"
+    ],
+    # ETFs - Broad Market
+    "Exchange Traded Fund": [
+        "Federal Reserve policy", "inflation trajectory", "earnings growth",
+        "market concentration", "recession indicators", "geopolitical risks"
+    ],
+}
+
+
+def _format_market_cap(market_cap: Optional[float]) -> str:
+    """Format market cap in human-readable form."""
+    if not market_cap:
+        return "N/A"
+    if market_cap >= 1e12:
+        return f"${market_cap / 1e12:.2f}T"
+    elif market_cap >= 1e9:
+        return f"${market_cap / 1e9:.2f}B"
+    elif market_cap >= 1e6:
+        return f"${market_cap / 1e6:.2f}M"
+    return f"${market_cap:,.0f}"
+
+
+def get_industry_keywords(industry: str, sector: str) -> list[str]:
+    """Get relevant macro/industry keywords for context analysis."""
+    # Try industry first, then sector, then default
+    keywords = INDUSTRY_KEYWORDS.get(industry, [])
+    if not keywords:
+        keywords = INDUSTRY_KEYWORDS.get(sector, [])
+    if not keywords:
+        # Default macro keywords
+        keywords = [
+            "interest rate environment", "inflation trends", "economic growth",
+            "regulatory changes", "competitive dynamics", "market sentiment"
+        ]
+    return keywords
 
 
 def fetch_fundamentals(ticker: str) -> TickerFundamentals:
-    """Fetch fundamental financial data for a ticker using yfinance."""
+    """Fetch comprehensive financial data for a ticker using yfinance."""
     try:
         stock = yf.Ticker(ticker)
         info = stock.info
 
-        # Format market cap
-        market_cap = info.get("marketCap")
-        if market_cap:
-            if market_cap >= 1e12:
-                market_cap_str = f"${market_cap / 1e12:.2f}T"
-            elif market_cap >= 1e9:
-                market_cap_str = f"${market_cap / 1e9:.2f}B"
-            elif market_cap >= 1e6:
-                market_cap_str = f"${market_cap / 1e6:.2f}M"
-            else:
-                market_cap_str = f"${market_cap:,.0f}"
-        else:
-            market_cap_str = "N/A"
+        # Extract business summary (truncated)
+        summary = info.get("longBusinessSummary", "")
+        if len(summary) > 400:
+            summary = summary[:397] + "..."
 
         return TickerFundamentals(
             ticker=ticker.upper(),
-            pe_ratio=info.get("trailingPE") or info.get("forwardPE"),
-            market_cap=market_cap,
-            market_cap_str=market_cap_str,
+            pe_ratio=info.get("trailingPE"),
+            forward_pe=info.get("forwardPE"),
+            market_cap=info.get("marketCap"),
+            market_cap_str=_format_market_cap(info.get("marketCap")),
             sector=info.get("sector", "N/A"),
             industry=info.get("industry", "N/A"),
             fifty_two_week_high=info.get("fiftyTwoWeekHigh"),
             fifty_two_week_low=info.get("fiftyTwoWeekLow"),
             current_price=info.get("currentPrice") or info.get("regularMarketPrice"),
+            beta=info.get("beta"),
+            dividend_yield=info.get("dividendYield"),
+            revenue_growth=info.get("revenueGrowth"),
+            profit_margin=info.get("profitMargins"),
+            debt_to_equity=info.get("debtToEquity"),
+            business_summary=summary,
         )
     except Exception as e:
         print(f"Error fetching fundamentals for {ticker}: {e}")
         return TickerFundamentals(
             ticker=ticker.upper(),
             pe_ratio=None,
+            forward_pe=None,
             market_cap=None,
             market_cap_str="N/A",
             sector="N/A",
@@ -69,6 +179,12 @@ def fetch_fundamentals(ticker: str) -> TickerFundamentals:
             fifty_two_week_high=None,
             fifty_two_week_low=None,
             current_price=None,
+            beta=None,
+            dividend_yield=None,
+            revenue_growth=None,
+            profit_margin=None,
+            debt_to_equity=None,
+            business_summary="",
         )
 
 
@@ -216,81 +332,147 @@ def build_equity_research_summary(
         sec_filings = [n for n in news_items if n.source == "SEC EDGAR"]
         news_articles = [n for n in news_items if n.source != "SEC EDGAR"]
 
-        # Format news for the prompt
+        # Format news for the prompt (include summary for context)
         news_text = ""
         if news_articles:
-            news_text = "\n".join([
-                f"- {n.title} ({n.source}, {n.published.strftime('%Y-%m-%d') if n.published else 'N/A'})"
-                for n in news_articles[:6]
-            ])
+            news_lines = []
+            for n in news_articles[:6]:
+                date_str = n.published.strftime('%Y-%m-%d') if n.published else 'N/A'
+                line = f"- **{n.title}** ({n.source}, {date_str})"
+                if n.summary:
+                    line += f"\n  {n.summary}"
+                news_lines.append(line)
+            news_text = "\n".join(news_lines)
         else:
             news_text = "No recent news articles available."
 
-        # Format SEC filings for the prompt
+        # Format SEC filings with filing type context
         filings_text = ""
         if sec_filings:
-            filings_text = "\n".join([
-                f"- {f.title} (Filed: {f.published.strftime('%Y-%m-%d') if f.published else 'N/A'})"
-                for f in sec_filings
-            ])
+            filing_lines = []
+            for f in sec_filings:
+                date_str = f.published.strftime('%Y-%m-%d') if f.published else 'N/A'
+                # Add context based on filing type
+                filing_context = ""
+                if "8-K" in f.title:
+                    filing_context = " [Material Event]"
+                elif "10-K" in f.title:
+                    filing_context = " [Annual Report]"
+                elif "10-Q" in f.title:
+                    filing_context = " [Quarterly Report]"
+                elif "DEF14A" in f.title or "DEF 14A" in f.title:
+                    filing_context = " [Proxy Statement]"
+                filing_lines.append(f"- {f.title}{filing_context} (Filed: {date_str})")
+            filings_text = "\n".join(filing_lines)
         else:
-            filings_text = "No recent SEC filings."
+            filings_text = "No recent SEC filings in the past 7 days."
 
-        # Format fundamentals
+        # Build comprehensive fundamentals text
         pe_str = f"{fundamentals.pe_ratio:.2f}" if fundamentals.pe_ratio else "N/A"
+        fwd_pe_str = f"{fundamentals.forward_pe:.2f}" if fundamentals.forward_pe else "N/A"
         price_str = f"${fundamentals.current_price:.2f}" if fundamentals.current_price else "N/A"
         high_52w = f"${fundamentals.fifty_two_week_high:.2f}" if fundamentals.fifty_two_week_high else "N/A"
         low_52w = f"${fundamentals.fifty_two_week_low:.2f}" if fundamentals.fifty_two_week_low else "N/A"
+        beta_str = f"{fundamentals.beta:.2f}" if fundamentals.beta else "N/A"
+        div_yield_str = f"{fundamentals.dividend_yield * 100:.2f}%" if fundamentals.dividend_yield else "N/A"
+        rev_growth_str = f"{fundamentals.revenue_growth * 100:.1f}%" if fundamentals.revenue_growth else "N/A"
+        margin_str = f"{fundamentals.profit_margin * 100:.1f}%" if fundamentals.profit_margin else "N/A"
+        de_str = f"{fundamentals.debt_to_equity:.1f}" if fundamentals.debt_to_equity else "N/A"
+
+        # Calculate 52-week position
+        position_52w = ""
+        if fundamentals.current_price and fundamentals.fifty_two_week_high and fundamentals.fifty_two_week_low:
+            range_size = fundamentals.fifty_two_week_high - fundamentals.fifty_two_week_low
+            if range_size > 0:
+                position = (fundamentals.current_price - fundamentals.fifty_two_week_low) / range_size * 100
+                position_52w = f" (currently at {position:.0f}% of 52-week range)"
 
         fundamentals_text = f"""
+**Valuation Metrics:**
 - Market Cap: {fundamentals.market_cap_str}
-- P/E Ratio: {pe_str}
+- Trailing P/E: {pe_str} | Forward P/E: {fwd_pe_str}
 - Current Price: {price_str}
-- 52-Week Range: {low_52w} - {high_52w}
+- 52-Week Range: {low_52w} - {high_52w}{position_52w}
+
+**Financial Health:**
+- Beta: {beta_str}
+- Dividend Yield: {div_yield_str}
+- Revenue Growth (YoY): {rev_growth_str}
+- Profit Margin: {margin_str}
+- Debt-to-Equity: {de_str}
+
+**Classification:**
 - Sector: {fundamentals.sector}
 - Industry: {fundamentals.industry}
 """
+
+        # Add business summary if available
+        if fundamentals.business_summary:
+            fundamentals_text += f"\n**Business:** {fundamentals.business_summary}\n"
+
+        # Get industry-specific keywords for macro context
+        industry_keywords = get_industry_keywords(fundamentals.industry, fundamentals.sector)
+        keywords_str = ", ".join(industry_keywords[:6])
 
         # Generate AI summary for this ticker
         try:
             client = anthropic.Anthropic(api_key=api_key)
 
-            system_prompt = """You are a Senior Equity Research Analyst writing professional investment summaries.
-Your analysis should be:
-- Data-driven and objective
-- Professional and analytical in tone
-- Focused on actionable insights
-- Free of generic filler content
+            system_prompt = """You are a Senior Equity Research Analyst at a top-tier investment bank.
 
-Use markdown formatting with clear headers."""
+Your analysis must be:
+- Rigorously data-driven with specific numbers and metrics
+- Professional, objective, and analytical in tone
+- Focused on actionable investment insights
+- Free of generic filler or boilerplate language
+- Concise yet comprehensive
 
-            user_prompt = f"""Generate a professional 3-paragraph equity research summary for {ticker} as of {today}.
+Structure each paragraph with a clear topic sentence followed by supporting analysis."""
 
-FINANCIAL DATA:
+            user_prompt = f"""Generate a professional equity research summary for **{ticker}** as of {today}.
+
+═══════════════════════════════════════════════════════════
+FINANCIAL DATA & FUNDAMENTALS
+═══════════════════════════════════════════════════════════
 {fundamentals_text}
 
-RECENT SEC FILINGS:
+═══════════════════════════════════════════════════════════
+RECENT SEC FILINGS (Past 7 Days)
+═══════════════════════════════════════════════════════════
 {filings_text}
 
-RECENT NEWS:
+═══════════════════════════════════════════════════════════
+RECENT NEWS & HEADLINES (Yahoo Finance, NewsAPI)
+═══════════════════════════════════════════════════════════
 {news_text}
 
-Write exactly 3 paragraphs with the following structure:
+═══════════════════════════════════════════════════════════
+INDUSTRY CONTEXT KEYWORDS
+═══════════════════════════════════════════════════════════
+{keywords_str}
 
-**Paragraph 1 - Fundamental & Operational Health:**
-Analyze the company's current financial position using the P/E ratio, Market Cap, and recent SEC filings. Summarize their core business strength and any immediate operational risks or successes.
+═══════════════════════════════════════════════════════════
+OUTPUT FORMAT: Write exactly 3 paragraphs with these headers
+═══════════════════════════════════════════════════════════
 
-**Paragraph 2 - Current News & Sentiment Analysis:**
-Synthesize the recent headlines. What is the market narrative right now? Identify if sentiment is bullish or bearish and highlight the single most important catalyst (earnings, product launch, legal issue, etc.).
+### Fundamental & Operational Health
+Analyze the company's current financial position. Use the P/E ratio (trailing vs forward), market cap classification, profit margins, debt levels, and any recent 10-K/10-Q filings. Assess core business strength, balance sheet health, and identify any immediate operational risks or recent successes from SEC disclosures.
 
-**Paragraph 3 - Macro Context & Industry Vector:**
-Explain how broader trends (AI, interest rates, supply chain, regulatory shifts) affect this specific ticker. Provide a forward-looking statement on how global shifts will impact the company over the next 6-12 months.
+### Current News & Sentiment Analysis
+Synthesize the recent headlines from Yahoo Finance and NewsAPI. What is the prevailing "market narrative" right now? Determine if sentiment is bullish, bearish, or neutral with supporting evidence. Identify the single most important **catalyst** driving current sentiment (e.g., earnings beat/miss, product launch, executive change, legal/regulatory action, M&A activity).
 
-Be specific and data-driven. Avoid generic statements. If data is limited, acknowledge it and focus on what IS available."""
+### Macro Context & Industry Vector
+Using the industry keywords provided ({keywords_str}), explain how macroeconomic and sector-specific trends are affecting this ticker. Address relevant factors like: interest rate environment, AI/technology shifts, regulatory changes, supply chain dynamics, or geopolitical risks. Provide a forward-looking statement on the company's trajectory over the next 6-12 months given these global shifts.
+
+CRITICAL INSTRUCTIONS:
+- Be specific: cite actual numbers, percentages, and metrics from the data provided
+- Avoid vague statements like "the company is well-positioned" without supporting data
+- If data is limited or unavailable, acknowledge this explicitly
+- Keep each paragraph focused and substantive (4-6 sentences each)"""
 
             response = client.messages.create(
                 model="claude-sonnet-4-20250514",
-                max_tokens=1200,
+                max_tokens=1500,
                 system=system_prompt,
                 messages=[{"role": "user", "content": user_prompt}],
             )
@@ -303,15 +485,15 @@ Be specific and data-driven. Avoid generic statements. If data is limited, ackno
             summaries.append(_fallback_ticker_summary(ticker, fundamentals, news_items))
 
     # Combine all summaries
-    header = f"# Equity Research Summary - {today}\n\n"
+    header = f"# Equity Research Summary\n**Date:** {today}\n\n"
     return header + "\n\n---\n\n".join(summaries)
 
 
 def _fallback_research_summary(news_by_ticker: dict[str, list[NewsItem]]) -> str:
     """Generate a fallback summary when AI is unavailable."""
     today = datetime.now().strftime("%B %d, %Y")
-    header = f"# Equity Research Summary - {today}\n\n"
-    header += "_Note: AI analysis unavailable. Displaying raw data._\n\n"
+    header = f"# Equity Research Summary\n**Date:** {today}\n\n"
+    header += "> *Note: AI analysis unavailable. Displaying structured raw data.*\n\n"
 
     sections = []
     for ticker, items in news_by_ticker.items():
@@ -330,8 +512,16 @@ def _fallback_ticker_summary(
     lines = [f"## {ticker}"]
 
     # Fundamentals section
+    lines.append("\n### Fundamental & Operational Health")
     pe_str = f"{fundamentals.pe_ratio:.2f}" if fundamentals.pe_ratio else "N/A"
-    lines.append(f"\n**Fundamentals:** Market Cap: {fundamentals.market_cap_str} | P/E: {pe_str} | Sector: {fundamentals.sector}")
+    fwd_pe_str = f"{fundamentals.forward_pe:.2f}" if fundamentals.forward_pe else "N/A"
+    margin_str = f"{fundamentals.profit_margin * 100:.1f}%" if fundamentals.profit_margin else "N/A"
+    de_str = f"{fundamentals.debt_to_equity:.1f}" if fundamentals.debt_to_equity else "N/A"
+
+    lines.append(f"- **Market Cap:** {fundamentals.market_cap_str}")
+    lines.append(f"- **Trailing P/E:** {pe_str} | **Forward P/E:** {fwd_pe_str}")
+    lines.append(f"- **Profit Margin:** {margin_str} | **Debt/Equity:** {de_str}")
+    lines.append(f"- **Sector:** {fundamentals.sector} | **Industry:** {fundamentals.industry}")
 
     # SEC Filings
     sec_filings = [n for n in news_items if n.source == "SEC EDGAR"]
@@ -341,12 +531,20 @@ def _fallback_ticker_summary(
             date_str = f.published.strftime('%Y-%m-%d') if f.published else "N/A"
             lines.append(f"- {f.title} ({date_str})")
 
-    # News
+    # News section
+    lines.append("\n### Current News & Sentiment Analysis")
     news_articles = [n for n in news_items if n.source != "SEC EDGAR"]
     if news_articles:
-        lines.append("\n**Recent News:**")
         for n in news_articles[:4]:
             date_str = n.published.strftime('%Y-%m-%d') if n.published else "N/A"
-            lines.append(f"- {n.title} ({n.source}, {date_str})")
+            lines.append(f"- **{n.title}** ({n.source}, {date_str})")
+    else:
+        lines.append("- No recent news available.")
+
+    # Macro context section
+    lines.append("\n### Macro Context & Industry Vector")
+    industry_keywords = get_industry_keywords(fundamentals.industry, fundamentals.sector)
+    lines.append(f"**Relevant Themes:** {', '.join(industry_keywords[:4])}")
+    lines.append("\n*AI-generated analysis unavailable. Review news and filings above for context.*")
 
     return "\n".join(lines)
